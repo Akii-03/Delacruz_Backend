@@ -25,6 +25,14 @@ export class CustomerService {
     );
     return rows;
   }
+  
+  async findByEmail(email: string) {
+  const [rows] = await this.pool().execute<RowDataPacket[]>(
+    'SELECT * FROM customer WHERE email = ?',
+    [email],
+  );
+  return rows[0] || null;
+}
 
   async findById(id: number) {
     const [rows] = await this.pool().execute<RowDataPacket[]>(
