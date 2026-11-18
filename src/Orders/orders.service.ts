@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { RowDataPacket, OkPacket, ResultSetHeader } from 'mysql2';
 
@@ -26,6 +26,38 @@ export class OrdersService {
   constructor(private db: DatabaseService) {}
 
   private pool = () => this.db.getPool();
+
+  /**
+   * Resolves `customer_id` from `req.user` returned by JwtStrategy
+   * (supports `userId`, `customer_id`, `sub`, `id`, or email/username lookup).
+   */
+  async resolveCustomerId(user: any): Promise<number> {
+    if (!user) {
+      throw new BadRequestException('Unauthenticated request: user missing from token.');
+    }
+
+    const directId =
+      user.customer_id ?? user.customerId ?? user.userId ?? user.sub ?? user.id;
+
+    if (directId !== undefined && directId !== null && !isNaN(Number(directId))) {
+      return Number(directId);
+    }
+
+    const identifier = user.email || user.username;
+    if (identifier) {
+      const [rows] = await this.pool().execute<RowDataPacket[]>(
+        'SELECT customer_id FROM customer WHERE email = ? LIMIT 1',
+        [identifier],
+      );
+      if (rows.length > 0) {
+        return Number(rows[0].customer_id);
+      }
+    }
+
+    throw new BadRequestException(
+      'Could not resolve customer_id from token. Ensure you are logged in as a Customer.',
+    );
+  }
 
   async getAll() {
     const sql = `

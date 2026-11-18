@@ -8,7 +8,6 @@ import {
   Body,
   UseGuards,
   Request,
-  BadRequestException,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -23,15 +22,12 @@ export class OrdersController {
     return this.ordersService.getAll();
   }
 
-  // MUST be placed BEFORE @Get(':id') so "my-orders" is not treated as an :id
+  // MUST stay above @Get(':id') so "my-orders" is not matched as an :id parameter
   @UseGuards(JwtAuthGuard)
   @Get('my-orders')
-  getMyOrders(@Request() req: any) {
-    const customerId = req.user?.customer_id || req.user?.sub || req.user?.id;
-    if (!customerId) {
-      throw new BadRequestException('Customer ID not found in token.');
-    }
-    return this.ordersService.findByOrderId(Number(customerId));
+  async getMyOrders(@Request() req: any) {
+    const customerId = await this.ordersService.resolveCustomerId(req.user);
+    return this.ordersService.findByOrderId(customerId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -49,16 +45,11 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async createOrder(@Request() req: any, @Body() body: any) {
-    // 1. Resolve customer_id from JWT token (or fallback to body.customer_id)
-    const customer_id = Number(
-      body.customer_id || req.user?.customer_id || req.user?.sub || req.user?.id,
-    );
+    // Resolves customer_id from body or JWT token (including userId / email fallback)
+    const customer_id = body.customer_id
+      ? Number(body.customer_id)
+      : await this.ordersService.resolveCustomerId(req.user);
 
-    if (!customer_id) {
-      throw new BadRequestException('Missing customer_id. Ensure you are logged in as a Customer.');
-    }
-
-    // 2. Pass the full checkout data (address, items, payment) to OrdersService
     return this.ordersService.createFullOrder({
       customer_id,
       address_num: body.address_num ? Number(body.address_num) : undefined,
