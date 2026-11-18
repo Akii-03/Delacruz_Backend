@@ -71,6 +71,38 @@ export class OrdersService {
     return rows;
   }
 
+  async getAllOrderItems() {
+    const sql = `
+      SELECT oi.*, p.product_name
+      FROM orderItems oi
+      LEFT JOIN products p ON oi.product_id = p.product_id
+      ORDER BY oi.order_item_id DESC
+    `;
+    const [rows] = await this.pool().query(sql);
+    return rows;
+  }
+
+  async getMyOrderItems(customer_id: number) {
+    const sql = `
+      SELECT oi.*, p.product_name
+      FROM orderItems oi
+      JOIN orders o ON oi.order_id = o.order_id
+      LEFT JOIN products p ON oi.product_id = p.product_id
+      WHERE o.customer_id = ?
+      ORDER BY oi.order_item_id DESC
+    `;
+    const [rows] = await this.pool().execute<RowDataPacket[]>(sql, [customer_id]);
+    return rows;
+  }
+
+  async deleteOrderItem(order_item_id: number) {
+    const [res] = await this.pool().execute<OkPacket>(
+      'DELETE FROM orderItems WHERE order_item_id = ?',
+      [order_item_id],
+    );
+    return res.affectedRows > 0;
+  }
+
   async findById(order_id: number) {
     const sql = `
       SELECT o.*, c.first_name, c.last_name, a.street, a.city, a.province, a.zip_code

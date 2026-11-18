@@ -22,7 +22,20 @@ export class OrdersController {
     return this.ordersService.getAll();
   }
 
-  // MUST stay above @Get(':id') so "my-orders" is not matched as an :id parameter
+  // Static routes MUST remain ABOVE @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @Get('items/all')
+  getAllOrderItems() {
+    return this.ordersService.getAllOrderItems();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('items/my-items')
+  async getMyOrderItems(@Request() req: any) {
+    const customerId = await this.ordersService.resolveCustomerId(req.user);
+    return this.ordersService.getMyOrderItems(customerId);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('my-orders')
   async getMyOrders(@Request() req: any) {
@@ -45,7 +58,6 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async createOrder(@Request() req: any, @Body() body: any) {
-    // Resolves customer_id from body or JWT token (including userId / email fallback)
     const customer_id = body.customer_id
       ? Number(body.customer_id)
       : await this.ordersService.resolveCustomerId(req.user);
@@ -73,6 +85,12 @@ export class OrdersController {
     @Body('order_status') order_status: string,
   ) {
     return this.ordersService.updateOrder(Number(id), order_status);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('items/:itemId')
+  async removeOrderItem(@Param('itemId') itemId: number) {
+    return this.ordersService.deleteOrderItem(Number(itemId));
   }
 
   @UseGuards(JwtAuthGuard)
